@@ -1,4 +1,4 @@
-module MilleFeuille where
+module MilleFeuille (Request, Headers, Response, Handler, Middleware, Options, create, stop) where
 
 import Prelude
 import Effect (Effect)
@@ -10,7 +10,7 @@ import Foreign.Object as Object
 import Control.Promise (Promise)
 import Control.Promise as Promise
 
-type Request options = { request :: Node.Request | options }
+type Request opts = { request :: Node.Request | opts }
 
 type Headers = Array (String /\ String)
 
@@ -26,21 +26,31 @@ type RawResponse =
   , body :: String
   }
 
-type Handler options response = Request options -> Aff (Response response)
+type Handler opts res
+  = Request opts
+  -> Aff (Response res)
 
-type Middleware handlerOpts handlerRes middleOpts middleRes =
-  Handler handlerOpts handlerRes -> Request middleOpts -> Aff (Response middleRes)
+type Middleware handlerOpts handlerRes middleOpts middleRes
+  = Handler handlerOpts handlerRes
+  -> Request middleOpts
+  -> Aff (Response middleRes)
 
-foreign import createImpl :: Options -> (Node.Request -> Promise RawResponse) -> Effect Node.Server
+foreign import createImpl
+  :: Options
+  -> (Node.Request -> Promise RawResponse)
+  -> Effect Node.Server
+
 foreign import stopImpl :: Node.Server -> Effect Unit
 
-type Options =
-  { port :: Int }
+type Options = { port :: Int }
 
 convertHeaders :: Response String -> RawResponse
 convertHeaders res = res { headers = Object.fromFoldable res.headers }
 
-convertHandler :: Handler () String -> Node.Request -> Effect (Promise RawResponse)
+convertHandler
+  :: Handler () String
+  -> Node.Request
+  -> Effect (Promise RawResponse)
 convertHandler handler request =
   let correctRequest = { request: request } in
   convertHeaders <$> handler correctRequest # Promise.fromAff
